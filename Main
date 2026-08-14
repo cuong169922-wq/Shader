@@ -1,0 +1,380 @@
+-- Script shader cinematic Roblox (Delta Executor)
+-- Tên menu: meo bị down
+-- Chức năng: 3 nút chất lượng Low/Medium/High, bật/tắt shader điện ảnh
+-- Di chuyển: kéo thanh tiêu đề | Phóng to: kéo góc dưới phải
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Lighting = game:GetService("Lighting")
+local UIS = game:GetService("UserInputService")
+
+-- Tạo GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MeoBiDownShader"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.IgnoreGuiInset = true
+
+-- Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 220, 0, 150)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -75)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+MainFrame.BorderSizePixel = 1
+MainFrame.Active = true
+
+-- Thanh tiêu đề (kéo menu)
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Parent = MainFrame
+TitleBar.Size = UDim2.new(1, 0, 0, 28)
+TitleBar.Position = UDim2.new(0, 0, 0, 0)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.BorderColor3 = Color3.fromRGB(0, 0, 0)
+TitleBar.Active = true
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "TitleLabel"
+TitleLabel.Parent = TitleBar
+TitleLabel.Size = UDim2.new(1, -30, 1, 0)
+TitleLabel.Position = UDim2.new(0, 5, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "meo bị down"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 15
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Nút đóng
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
+CloseButton.Parent = TitleBar
+CloseButton.Size = UDim2.new(0, 22, 0, 22)
+CloseButton.Position = UDim2.new(1, -24, 0, 3)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 13
+CloseButton.AutoButtonColor = true
+
+-- Khung nội dung
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Parent = MainFrame
+ContentFrame.Size = UDim2.new(1, 0, 1, -28)
+ContentFrame.Position = UDim2.new(0, 0, 0, 28)
+ContentFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+ContentFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+ContentFrame.BorderSizePixel = 1
+
+-- Nút resize (góc dưới phải)
+local ResizeHandle = Instance.new("TextButton")
+ResizeHandle.Name = "ResizeHandle"
+ResizeHandle.Parent = MainFrame
+ResizeHandle.Size = UDim2.new(0, 14, 0, 14)
+ResizeHandle.Position = UDim2.new(1, -14, 1, -14)
+ResizeHandle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ResizeHandle.BorderColor3 = Color3.fromRGB(0, 0, 0)
+ResizeHandle.Text = "↘"
+ResizeHandle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ResizeHandle.Font = Enum.Font.GothamBold
+ResizeHandle.TextSize = 9
+ResizeHandle.AutoButtonColor = false
+ResizeHandle.ZIndex = 10
+
+-- 3 nút chất lượng
+local buttonWidth = 60
+local buttonHeight = 30
+local gap = 10
+local totalWidth = buttonWidth * 3 + gap * 2
+local startX = (220 - totalWidth) / 2  -- căn giữa
+
+local btnLow = Instance.new("TextButton")
+btnLow.Name = "Low"
+btnLow.Parent = ContentFrame
+btnLow.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
+btnLow.Position = UDim2.new(0, startX, 0, 30)
+btnLow.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+btnLow.Text = "LOW"
+btnLow.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnLow.Font = Enum.Font.GothamBold
+btnLow.TextSize = 13
+btnLow.AutoButtonColor = true
+
+local btnMedium = Instance.new("TextButton")
+btnMedium.Name = "Medium"
+btnMedium.Parent = ContentFrame
+btnMedium.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
+btnMedium.Position = UDim2.new(0, startX + buttonWidth + gap, 0, 30)
+btnMedium.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+btnMedium.Text = "MED"
+btnMedium.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnMedium.Font = Enum.Font.GothamBold
+btnMedium.TextSize = 13
+btnMedium.AutoButtonColor = true
+
+local btnHigh = Instance.new("TextButton")
+btnHigh.Name = "High"
+btnHigh.Parent = ContentFrame
+btnHigh.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
+btnHigh.Position = UDim2.new(0, startX + (buttonWidth + gap) * 2, 0, 30)
+btnHigh.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+btnHigh.Text = "HIGH"
+btnHigh.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnHigh.Font = Enum.Font.GothamBold
+btnHigh.TextSize = 13
+btnHigh.AutoButtonColor = true
+
+-- Biến trạng thái
+local activeQuality = nil  -- "low", "medium", "high" hoặc nil (tắt)
+local originalSaved = false
+local originalLighting = {}
+local effects = {}
+
+-- Lưu cài đặt gốc
+local function saveOriginalLighting()
+    originalLighting = {
+        Brightness = Lighting.Brightness,
+        ClockTime = Lighting.ClockTime,
+        Ambient = Lighting.Ambient,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+        FogColor = Lighting.FogColor,
+        FogStart = Lighting.FogStart,
+        FogEnd = Lighting.FogEnd,
+        GlobalShadows = Lighting.GlobalShadows,
+        ShadowSoftness = Lighting.ShadowSoftness,
+        ExposureCompensation = Lighting.ExposureCompensation,
+        ColorShift_Top = Lighting.ColorShift_Top,
+        ColorShift_Bottom = Lighting.ColorShift_Bottom,
+        GeographicLatitude = Lighting.GeographicLatitude,
+        TimeOfDay = Lighting.TimeOfDay,
+    }
+    originalSaved = true
+end
+
+-- Xóa hiệu ứng cũ
+local function clearEffects()
+    for _, effect in ipairs(effects) do
+        if effect and effect.Parent then
+            effect:Destroy()
+        end
+    end
+    effects = {}
+end
+
+-- Áp dụng shader điện ảnh theo chất lượng
+local function applyCinematic(quality)
+    clearEffects()
+    if not originalSaved then
+        saveOriginalLighting()
+    end
+
+    -- Ánh sáng tự nhiên (golden hour)
+    Lighting.Brightness = 2.5
+    Lighting.ClockTime = 14.5
+    Lighting.Ambient = Color3.fromRGB(100, 110, 130)
+    Lighting.OutdoorAmbient = Color3.fromRGB(90, 100, 120)
+    Lighting.FogColor = Color3.fromRGB(200, 210, 230)
+    Lighting.FogStart = 100
+    Lighting.FogEnd = 500
+    Lighting.GlobalShadows = true
+    Lighting.ShadowSoftness = 0.3
+    Lighting.ExposureCompensation = 0.2
+    Lighting.ColorShift_Top = Color3.fromRGB(255, 200, 150)
+    Lighting.ColorShift_Bottom = Color3.fromRGB(50, 70, 120)
+    Lighting.GeographicLatitude = 35
+    Lighting.TimeOfDay = "14:30:00"
+
+    -- Color Correction
+    local colorCorrection = Instance.new("ColorCorrectionEffect")
+    colorCorrection.Name = "CinematicColorCorrection"
+    colorCorrection.Saturation = 0.8
+    colorCorrection.Contrast = 0.2
+    colorCorrection.Brightness = 0.05
+    colorCorrection.TintColor = Color3.fromRGB(255, 230, 200)
+    colorCorrection.Parent = Lighting
+    table.insert(effects, colorCorrection)
+
+    -- Bloom
+    local bloom = Instance.new("BloomEffect")
+    bloom.Name = "CinematicBloom"
+    bloom.Intensity = (quality == "high") and 0.6 or (quality == "medium") and 0.4 or 0.2
+    bloom.Size = 40
+    bloom.Threshold = 0.7
+    bloom.Parent = Lighting
+    table.insert(effects, bloom)
+
+    -- Sun Rays
+    local sunRays = Instance.new("SunRaysEffect")
+    sunRays.Name = "CinematicSunRays"
+    sunRays.Intensity = (quality == "high") and 0.2 or (quality == "medium") and 0.1 or 0.05
+    sunRays.Spread = 0.8
+    sunRays.Parent = Lighting
+    table.insert(effects, sunRays)
+
+    -- Depth of Field (chỉ bật ở High)
+    local depthOfField = Instance.new("DepthOfFieldEffect")
+    depthOfField.Name = "CinematicDepthOfField"
+    depthOfField.Enabled = (quality == "high")
+    depthOfField.NearIntensity = 0.1
+    depthOfField.FarIntensity = 0.3
+    depthOfField.FocusDistance = 50
+    depthOfField.InFocusRadius = 20
+    depthOfField.Parent = Lighting
+    table.insert(effects, depthOfField)
+
+    -- Atmosphere (sương mù nhẹ)
+    local atmosphere = Instance.new("Atmosphere")
+    atmosphere.Name = "CinematicAtmosphere"
+    atmosphere.Density = 0.3
+    atmosphere.Offset = 0.2
+    atmosphere.Color = Color3.fromRGB(200, 210, 230)
+    atmosphere.Decay = Color3.fromRGB(255, 220, 180)
+    atmosphere.Glare = 0.1
+    atmosphere.Haze = 1
+    atmosphere.Parent = Lighting
+    table.insert(effects, atmosphere)
+end
+
+-- Khôi phục cài đặt gốc
+local function revertOriginal()
+    clearEffects()
+    if originalSaved then
+        Lighting.Brightness = originalLighting.Brightness
+        Lighting.ClockTime = originalLighting.ClockTime
+        Lighting.Ambient = originalLighting.Ambient
+        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+        Lighting.FogColor = originalLighting.FogColor
+        Lighting.FogStart = originalLighting.FogStart
+        Lighting.FogEnd = originalLighting.FogEnd
+        Lighting.GlobalShadows = originalLighting.GlobalShadows
+        Lighting.ShadowSoftness = originalLighting.ShadowSoftness
+        Lighting.ExposureCompensation = originalLighting.ExposureCompensation
+        Lighting.ColorShift_Top = originalLighting.ColorShift_Top
+        Lighting.ColorShift_Bottom = originalLighting.ColorShift_Bottom
+        Lighting.GeographicLatitude = originalLighting.GeographicLatitude
+        Lighting.TimeOfDay = originalLighting.TimeOfDay
+    end
+end
+
+-- Cập nhật trạng thái nút
+local function updateButtons()
+    btnLow.BackgroundColor3 = (activeQuality == "low") and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
+    btnMedium.BackgroundColor3 = (activeQuality == "medium") and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
+    btnHigh.BackgroundColor3 = (activeQuality == "high") and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
+end
+
+-- Xử lý khi nhấn nút chất lượng
+local function onQualityClick(quality)
+    if activeQuality == quality then
+        -- Tắt shader
+        revertOriginal()
+        activeQuality = nil
+    else
+        -- Bật shader với chất lượng mới
+        if not originalSaved then
+            saveOriginalLighting()
+        end
+        applyCinematic(quality)
+        activeQuality = quality
+    end
+    updateButtons()
+end
+
+btnLow.MouseButton1Click:Connect(function() onQualityClick("low") end)
+btnMedium.MouseButton1Click:Connect(function() onQualityClick("medium") end)
+btnHigh.MouseButton1Click:Connect(function() onQualityClick("high") end)
+
+-- Đóng menu
+CloseButton.MouseButton1Click:Connect(function()
+    revertOriginal()
+    ScreenGui:Destroy()
+end)
+
+-- ====== DI CHUYỂN MENU ======
+local dragStartPos = nil
+local frameStartPos = nil
+local dragging = false
+
+local function isInBounds(pos, guiObject)
+    local absPos = guiObject.AbsolutePosition
+    local absSize = guiObject.AbsoluteSize
+    return pos.X >= absPos.X and pos.X <= absPos.X + absSize.X and
+           pos.Y >= absPos.Y and pos.Y <= absPos.Y + absSize.Y
+end
+
+local function startDrag(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
+        if isInBounds(mousePos, TitleBar) and not isInBounds(mousePos, ResizeHandle) then
+            dragging = true
+            dragStartPos = mousePos
+            frameStartPos = MainFrame.Position
+        end
+    end
+end
+
+local function updateDrag(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
+        local delta = mousePos - dragStartPos
+        MainFrame.Position = UDim2.new(frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X, frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y)
+    end
+end
+
+local function endDrag(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+        dragStartPos = nil
+        frameStartPos = nil
+    end
+end
+
+UIS.InputBegan:Connect(startDrag)
+UIS.InputChanged:Connect(updateDrag)
+UIS.InputEnded:Connect(endDrag)
+
+-- ====== PHÓNG TO / THU NHỎ MENU ======
+local resizeStartPos = nil
+local frameStartSize = nil
+local resizing = false
+
+local function startResize(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
+        if isInBounds(mousePos, ResizeHandle) then
+            resizing = true
+            resizeStartPos = mousePos
+            frameStartSize = MainFrame.Size
+        end
+    end
+end
+
+local function updateResize(input)
+    if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
+        local delta = mousePos - resizeStartPos
+        local newWidth = math.max(180, frameStartSize.X.Offset + delta.X)
+        local newHeight = math.max(120, frameStartSize.Y.Offset + delta.Y)
+        MainFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
+    end
+end
+
+local function endResize(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        resizing = false
+        resizeStartPos = nil
+        frameStartSize = nil
+    end
+end
+
+UIS.InputBegan:Connect(startResize)
+UIS.InputChanged:Connect(updateResize)
+UIS.InputEnded:Connect(endResize)
+
+print("Shader menu 'meo bị down' (3 nút chất lượng) đã sẵn sàng!")
