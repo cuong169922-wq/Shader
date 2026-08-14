@@ -1,14 +1,15 @@
--- Script shader cinematic Roblox (Delta Executor)
+-- Script shader điện ảnh Roblox (Delta Executor)
 -- Tên menu: meo bị down
--- Chức năng: 3 nút chất lượng Low/Medium/High, bật/tắt shader điện ảnh
--- Di chuyển: kéo thanh tiêu đề | Phóng to: kéo góc dưới phải
+-- Ngày & đêm: 12 phút = 1 ngày
+-- Mây điện ảnh, ánh sáng tự nhiên, bóng đổ mềm
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 
--- Tạo GUI
+-- ==================== TẠO GUI ====================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MeoBiDownShader"
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
@@ -16,7 +17,6 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
 
--- Main Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
@@ -27,7 +27,6 @@ MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 MainFrame.BorderSizePixel = 1
 MainFrame.Active = true
 
--- Thanh tiêu đề (kéo menu)
 local TitleBar = Instance.new("Frame")
 TitleBar.Name = "TitleBar"
 TitleBar.Parent = MainFrame
@@ -49,7 +48,6 @@ TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextSize = 15
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Nút đóng
 local CloseButton = Instance.new("TextButton")
 CloseButton.Name = "CloseButton"
 CloseButton.Parent = TitleBar
@@ -62,7 +60,6 @@ CloseButton.Font = Enum.Font.GothamBold
 CloseButton.TextSize = 13
 CloseButton.AutoButtonColor = true
 
--- Khung nội dung
 local ContentFrame = Instance.new("Frame")
 ContentFrame.Name = "ContentFrame"
 ContentFrame.Parent = MainFrame
@@ -72,18 +69,17 @@ ContentFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 ContentFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 ContentFrame.BorderSizePixel = 1
 
--- Nút resize (góc dưới phải)
 local ResizeHandle = Instance.new("TextButton")
 ResizeHandle.Name = "ResizeHandle"
 ResizeHandle.Parent = MainFrame
-ResizeHandle.Size = UDim2.new(0, 14, 0, 14)
-ResizeHandle.Position = UDim2.new(1, -14, 1, -14)
+ResizeHandle.Size = UDim2.new(0, 18, 0, 18)
+ResizeHandle.Position = UDim2.new(1, -18, 1, -18)
 ResizeHandle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 ResizeHandle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 ResizeHandle.Text = "↘"
 ResizeHandle.TextColor3 = Color3.fromRGB(255, 255, 255)
 ResizeHandle.Font = Enum.Font.GothamBold
-ResizeHandle.TextSize = 9
+ResizeHandle.TextSize = 10
 ResizeHandle.AutoButtonColor = false
 ResizeHandle.ZIndex = 10
 
@@ -92,7 +88,7 @@ local buttonWidth = 60
 local buttonHeight = 30
 local gap = 10
 local totalWidth = buttonWidth * 3 + gap * 2
-local startX = (220 - totalWidth) / 2  -- căn giữa
+local startX = (220 - totalWidth) / 2
 
 local btnLow = Instance.new("TextButton")
 btnLow.Name = "Low"
@@ -130,13 +126,18 @@ btnHigh.Font = Enum.Font.GothamBold
 btnHigh.TextSize = 13
 btnHigh.AutoButtonColor = true
 
--- Biến trạng thái
+-- ==================== BIẾN TRẠNG THÁI ====================
 local activeQuality = nil  -- "low", "medium", "high" hoặc nil (tắt)
+local shaderEnabled = false
 local originalSaved = false
 local originalLighting = {}
-local effects = {}
+local originalSky = nil
+local originalClouds = nil
+local effects = {}        -- chứa các effect, sky, clouds mới tạo
+local timeLoopRunning = false
+local timeMultiplier = 24 / 720  -- 24 giờ / 720 giây = 12 phút 1 ngày
 
--- Lưu cài đặt gốc
+-- ==================== HÀM LƯU & KHÔI PHỤC ====================
 local function saveOriginalLighting()
     originalLighting = {
         Brightness = Lighting.Brightness,
@@ -154,10 +155,22 @@ local function saveOriginalLighting()
         GeographicLatitude = Lighting.GeographicLatitude,
         TimeOfDay = Lighting.TimeOfDay,
     }
+    
+    -- Lưu Sky và Clouds gốc (nếu có)
+    originalSky = Lighting:FindFirstChildOfClass("Sky")
+    originalClouds = Lighting:FindFirstChildOfClass("Clouds")
+    
+    -- Tạm thời gỡ chúng khỏi Lighting để không xung đột
+    if originalSky then
+        originalSky.Parent = nil
+    end
+    if originalClouds then
+        originalClouds.Parent = nil
+    end
+    
     originalSaved = true
 end
 
--- Xóa hiệu ứng cũ
 local function clearEffects()
     for _, effect in ipairs(effects) do
         if effect and effect.Parent then
@@ -167,83 +180,11 @@ local function clearEffects()
     effects = {}
 end
 
--- Áp dụng shader điện ảnh theo chất lượng
-local function applyCinematic(quality)
-    clearEffects()
-    if not originalSaved then
-        saveOriginalLighting()
-    end
-
-    -- Ánh sáng tự nhiên (golden hour)
-    Lighting.Brightness = 2.5
-    Lighting.ClockTime = 14.5
-    Lighting.Ambient = Color3.fromRGB(100, 110, 130)
-    Lighting.OutdoorAmbient = Color3.fromRGB(90, 100, 120)
-    Lighting.FogColor = Color3.fromRGB(200, 210, 230)
-    Lighting.FogStart = 100
-    Lighting.FogEnd = 500
-    Lighting.GlobalShadows = true
-    Lighting.ShadowSoftness = 0.3
-    Lighting.ExposureCompensation = 0.2
-    Lighting.ColorShift_Top = Color3.fromRGB(255, 200, 150)
-    Lighting.ColorShift_Bottom = Color3.fromRGB(50, 70, 120)
-    Lighting.GeographicLatitude = 35
-    Lighting.TimeOfDay = "14:30:00"
-
-    -- Color Correction
-    local colorCorrection = Instance.new("ColorCorrectionEffect")
-    colorCorrection.Name = "CinematicColorCorrection"
-    colorCorrection.Saturation = 0.8
-    colorCorrection.Contrast = 0.2
-    colorCorrection.Brightness = 0.05
-    colorCorrection.TintColor = Color3.fromRGB(255, 230, 200)
-    colorCorrection.Parent = Lighting
-    table.insert(effects, colorCorrection)
-
-    -- Bloom
-    local bloom = Instance.new("BloomEffect")
-    bloom.Name = "CinematicBloom"
-    bloom.Intensity = (quality == "high") and 0.6 or (quality == "medium") and 0.4 or 0.2
-    bloom.Size = 40
-    bloom.Threshold = 0.7
-    bloom.Parent = Lighting
-    table.insert(effects, bloom)
-
-    -- Sun Rays
-    local sunRays = Instance.new("SunRaysEffect")
-    sunRays.Name = "CinematicSunRays"
-    sunRays.Intensity = (quality == "high") and 0.2 or (quality == "medium") and 0.1 or 0.05
-    sunRays.Spread = 0.8
-    sunRays.Parent = Lighting
-    table.insert(effects, sunRays)
-
-    -- Depth of Field (chỉ bật ở High)
-    local depthOfField = Instance.new("DepthOfFieldEffect")
-    depthOfField.Name = "CinematicDepthOfField"
-    depthOfField.Enabled = (quality == "high")
-    depthOfField.NearIntensity = 0.1
-    depthOfField.FarIntensity = 0.3
-    depthOfField.FocusDistance = 50
-    depthOfField.InFocusRadius = 20
-    depthOfField.Parent = Lighting
-    table.insert(effects, depthOfField)
-
-    -- Atmosphere (sương mù nhẹ)
-    local atmosphere = Instance.new("Atmosphere")
-    atmosphere.Name = "CinematicAtmosphere"
-    atmosphere.Density = 0.3
-    atmosphere.Offset = 0.2
-    atmosphere.Color = Color3.fromRGB(200, 210, 230)
-    atmosphere.Decay = Color3.fromRGB(255, 220, 180)
-    atmosphere.Glare = 0.1
-    atmosphere.Haze = 1
-    atmosphere.Parent = Lighting
-    table.insert(effects, atmosphere)
-end
-
--- Khôi phục cài đặt gốc
 local function revertOriginal()
     clearEffects()
+    timeLoopRunning = false
+    shaderEnabled = false
+    
     if originalSaved then
         Lighting.Brightness = originalLighting.Brightness
         Lighting.ClockTime = originalLighting.ClockTime
@@ -259,17 +200,230 @@ local function revertOriginal()
         Lighting.ColorShift_Bottom = originalLighting.ColorShift_Bottom
         Lighting.GeographicLatitude = originalLighting.GeographicLatitude
         Lighting.TimeOfDay = originalLighting.TimeOfDay
+        
+        -- Trả lại Sky và Clouds gốc
+        if originalSky then
+            originalSky.Parent = Lighting
+        end
+        if originalClouds then
+            originalClouds.Parent = Lighting
+        end
     end
 end
 
--- Cập nhật trạng thái nút
-local function updateButtons()
-    btnLow.BackgroundColor3 = (activeQuality == "low") and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
-    btnMedium.BackgroundColor3 = (activeQuality == "medium") and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
-    btnHigh.BackgroundColor3 = (activeQuality == "high") and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
+-- ==================== HÀM CẬP NHẬT MÔI TRƯỜNG THEO THỜI GIAN ====================
+local function lerpColor(c1, c2, t)
+    return Color3.new(
+        c1.R + (c2.R - c1.R) * t,
+        c1.G + (c2.G - c1.G) * t,
+        c1.B + (c2.B - c1.B) * t
+    )
 end
 
--- Xử lý khi nhấn nút chất lượng
+local function updateEnvironment(time)
+    -- time: 0 - 24 giờ
+    local hour = time % 24
+    
+    -- Xác định phase: bình minh, ngày, hoàng hôn, đêm
+    local morningStart, morningEnd = 5, 8
+    local dayStart, dayEnd = 8, 17
+    local duskStart, duskEnd = 17, 20
+    
+    local ambient, outdoorAmbient, fogColor, colorTop, colorBottom, exposure, bloomIntensity, sunRaysIntensity, cloudDensity, cloudCover
+    
+    if hour >= morningStart and hour < morningEnd then
+        -- BÌNH MINH: vàng dịu pha xanh lá, không quá cam
+        local t = (hour - morningStart) / (morningEnd - morningStart)
+        ambient = lerpColor(Color3.fromRGB(80, 100, 110), Color3.fromRGB(150, 170, 130), t)
+        outdoorAmbient = lerpColor(Color3.fromRGB(70, 90, 100), Color3.fromRGB(140, 160, 120), t)
+        fogColor = lerpColor(Color3.fromRGB(180, 200, 210), Color3.fromRGB(220, 240, 210), t)
+        colorTop = lerpColor(Color3.fromRGB(200, 210, 180), Color3.fromRGB(240, 250, 200), t)  -- vàng xanh nhạt
+        colorBottom = lerpColor(Color3.fromRGB(60, 80, 110), Color3.fromRGB(110, 130, 100), t)
+        exposure = 0.3
+        bloomIntensity = 0.4
+        sunRaysIntensity = 0.3
+        cloudDensity = 0.4
+        cloudCover = 0.5
+    elseif hour >= morningEnd and hour < dayStart then
+        -- TRƯA: trung tính, sáng rõ
+        local t = (hour - morningEnd) / (dayStart - morningEnd)
+        ambient = lerpColor(Color3.fromRGB(150, 170, 130), Color3.fromRGB(160, 180, 190), t)
+        outdoorAmbient = lerpColor(Color3.fromRGB(140, 160, 120), Color3.fromRGB(150, 170, 180), t)
+        fogColor = lerpColor(Color3.fromRGB(220, 240, 210), Color3.fromRGB(200, 220, 240), t)
+        colorTop = lerpColor(Color3.fromRGB(240, 250, 200), Color3.fromRGB(200, 210, 240), t)
+        colorBottom = lerpColor(Color3.fromRGB(110, 130, 100), Color3.fromRGB(120, 140, 160), t)
+        exposure = 0.2
+        bloomIntensity = 0.3
+        sunRaysIntensity = 0.1
+        cloudDensity = 0.5
+        cloudCover = 0.6
+    elseif hour >= dayStart and hour < duskStart then
+        -- HOÀNG HÔN: cam nhẹ, ấm áp
+        local t = (hour - dayStart) / (duskStart - dayStart)
+        ambient = lerpColor(Color3.fromRGB(160, 180, 190), Color3.fromRGB(200, 150, 110), t)
+        outdoorAmbient = lerpColor(Color3.fromRGB(150, 170, 180), Color3.fromRGB(190, 140, 100), t)
+        fogColor = lerpColor(Color3.fromRGB(200, 220, 240), Color3.fromRGB(240, 200, 160), t)
+        colorTop = lerpColor(Color3.fromRGB(200, 210, 240), Color3.fromRGB(255, 180, 120), t)
+        colorBottom = lerpColor(Color3.fromRGB(120, 140, 160), Color3.fromRGB(120, 90, 60), t)
+        exposure = 0.15
+        bloomIntensity = 0.5
+        sunRaysIntensity = 0.4
+        cloudDensity = 0.6
+        cloudCover = 0.7
+    else
+        -- ĐÊM: xanh đậm, tối, yên bình
+        local t
+        if hour >= duskStart and hour < 24 then
+            t = (hour - duskStart) / (24 - duskStart)
+        else
+            t = (hour + (24 - duskStart)) / (24 - duskStart + morningStart)  -- từ 20h đến 5h sáng
+        end
+        ambient = lerpColor(Color3.fromRGB(200, 150, 110), Color3.fromRGB(30, 40, 80), t)
+        outdoorAmbient = lerpColor(Color3.fromRGB(190, 140, 100), Color3.fromRGB(20, 30, 70), t)
+        fogColor = lerpColor(Color3.fromRGB(240, 200, 160), Color3.fromRGB(40, 50, 90), t)
+        colorTop = lerpColor(Color3.fromRGB(255, 180, 120), Color3.fromRGB(30, 40, 100), t)
+        colorBottom = lerpColor(Color3.fromRGB(120, 90, 60), Color3.fromRGB(20, 20, 40), t)
+        exposure = 0.0
+        bloomIntensity = 0.2
+        sunRaysIntensity = 0.0
+        cloudDensity = 0.4
+        cloudCover = 0.4
+    end
+    
+    -- Áp dụng vào Lighting
+    Lighting.Ambient = ambient
+    Lighting.OutdoorAmbient = outdoorAmbient
+    Lighting.FogColor = fogColor
+    Lighting.ColorShift_Top = colorTop
+    Lighting.ColorShift_Bottom = colorBottom
+    Lighting.ExposureCompensation = exposure
+    
+    -- Cập nhật effect intensities (nếu tồn tại)
+    for _, effect in ipairs(effects) do
+        if effect:IsA("BloomEffect") then
+            effect.Intensity = bloomIntensity
+        elseif effect:IsA("SunRaysEffect") then
+            effect.Intensity = sunRaysIntensity
+        elseif effect:IsA("Clouds") then
+            effect.Density = cloudDensity
+            effect.Cover = cloudCover
+        elseif effect:IsA("Atmosphere") then
+            effect.Density = 0.2 + cloudDensity * 0.2
+        end
+    end
+    
+    -- Cập nhật hướng mặt trời
+    local sunAngle = (hour - 6) / 12 * math.pi  -- 6h mọc, 18h lặn
+    local sunDirection = Vector3.new(math.cos(sunAngle), math.sin(sunAngle), 0).Unit
+    if sunDirection.Y < 0 then sunDirection = Vector3.new(0, -0.1, 0) end  -- ban đêm
+    for _, effect in ipairs(effects) do
+        if effect:IsA("Sky") then
+            effect.SunDirection = sunDirection
+        end
+    end
+end
+
+-- ==================== HÀM BẬT SHADER ====================
+local function applyCinematic(quality)
+    clearEffects()
+    if not originalSaved then
+        saveOriginalLighting()
+    end
+    
+    -- Tạo Sky điện ảnh
+    local sky = Instance.new("Sky")
+    sky.Name = "CinematicSky"
+    sky.SunAngularSize = 8
+    sky.MoonAngularSize = 6
+    sky.SunTextureId = "rbxassetid://1234567890"  -- có thể thay bằng texture mặt trời đẹp
+    sky.MoonTextureId = "rbxassetid://1234567891"
+    sky.Parent = Lighting
+    table.insert(effects, sky)
+    
+    -- Tạo mây (nếu được hỗ trợ)
+    pcall(function()
+        local clouds = Instance.new("Clouds")
+        clouds.Name = "CinematicClouds"
+        clouds.Density = 0.5
+        clouds.Cover = 0.6
+        clouds.Color = Color3.fromRGB(255, 255, 255)
+        clouds.Parent = Lighting
+        table.insert(effects, clouds)
+    end)
+    
+    -- Color Correction
+    local colorCorrection = Instance.new("ColorCorrectionEffect")
+    colorCorrection.Name = "CinematicColorCorrection"
+    colorCorrection.Saturation = 0.85
+    colorCorrection.Contrast = 0.2
+    colorCorrection.Brightness = 0.0
+    colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
+    colorCorrection.Parent = Lighting
+    table.insert(effects, colorCorrection)
+    
+    -- Bloom
+    local bloom = Instance.new("BloomEffect")
+    bloom.Name = "CinematicBloom"
+    bloom.Intensity = 0.3
+    bloom.Size = 40
+    bloom.Threshold = 0.7
+    bloom.Parent = Lighting
+    table.insert(effects, bloom)
+    
+    -- Sun Rays
+    local sunRays = Instance.new("SunRaysEffect")
+    sunRays.Name = "CinematicSunRays"
+    sunRays.Intensity = 0.2
+    sunRays.Spread = 0.8
+    sunRays.Parent = Lighting
+    table.insert(effects, sunRays)
+    
+    -- Depth of Field (chỉ High)
+    local depthOfField = Instance.new("DepthOfFieldEffect")
+    depthOfField.Name = "CinematicDepthOfField"
+    depthOfField.Enabled = (quality == "high")
+    depthOfField.NearIntensity = 0.1
+    depthOfField.FarIntensity = 0.3
+    depthOfField.FocusDistance = 50
+    depthOfField.InFocusRadius = 20
+    depthOfField.Parent = Lighting
+    table.insert(effects, depthOfField)
+    
+    -- Atmosphere
+    local atmosphere = Instance.new("Atmosphere")
+    atmosphere.Name = "CinematicAtmosphere"
+    atmosphere.Density = 0.25
+    atmosphere.Offset = 0.2
+    atmosphere.Color = Color3.fromRGB(200, 210, 230)
+    atmosphere.Decay = Color3.fromRGB(255, 220, 180)
+    atmosphere.Glare = 0.1
+    atmosphere.Haze = 1
+    atmosphere.Parent = Lighting
+    table.insert(effects, atmosphere)
+    
+    -- Bật bóng đổ mềm
+    Lighting.GlobalShadows = true
+    Lighting.ShadowSoftness = 0.3
+    Lighting.GeographicLatitude = 35
+    
+    -- Khởi động vòng lặp thời gian
+    shaderEnabled = true
+    timeLoopRunning = true
+    local lastTick = os.clock()
+    
+    spawn(function()
+        while timeLoopRunning do
+            local now = os.clock()
+            local delta = now - lastTick
+            lastTick = now
+            Lighting.ClockTime = (Lighting.ClockTime + delta * timeMultiplier) % 24
+            updateEnvironment(Lighting.ClockTime)
+            wait(0.1)  -- cập nhật 10 lần/giây để mượt
+        end
+    end)
+end
+
+-- ==================== XỬ LÝ NÚT ====================
 local function onQualityClick(quality)
     if activeQuality == quality then
         -- Tắt shader
@@ -286,95 +440,74 @@ local function onQualityClick(quality)
     updateButtons()
 end
 
+function updateButtons()
+    btnLow.BackgroundColor3 = (activeQuality == "low") and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
+    btnMedium.BackgroundColor3 = (activeQuality == "medium") and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
+    btnHigh.BackgroundColor3 = (activeQuality == "high") and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
+end
+
 btnLow.MouseButton1Click:Connect(function() onQualityClick("low") end)
 btnMedium.MouseButton1Click:Connect(function() onQualityClick("medium") end)
 btnHigh.MouseButton1Click:Connect(function() onQualityClick("high") end)
 
--- Đóng menu
+-- ==================== DI CHUYỂN MENU ====================
+local dragStartPos = nil
+local frameStartPos = nil
+local dragging = false
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStartPos = Vector2.new(input.Position.X, input.Position.Y)
+        frameStartPos = MainFrame.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStartPos
+        MainFrame.Position = UDim2.new(frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X, frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y)
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- ==================== PHÓNG TO / THU NHỎ ====================
+local resizeStartPos = nil
+local frameStartSize = nil
+local resizing = false
+
+ResizeHandle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        resizing = true
+        resizeStartPos = Vector2.new(input.Position.X, input.Position.Y)
+        frameStartSize = MainFrame.Size
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = Vector2.new(input.Position.X, input.Position.Y) - resizeStartPos
+        local newWidth = math.max(180, frameStartSize.X.Offset + delta.X)
+        local newHeight = math.max(120, frameStartSize.Y.Offset + delta.Y)
+        MainFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        resizing = false
+    end
+end)
+
+-- ==================== ĐÓNG MENU ====================
 CloseButton.MouseButton1Click:Connect(function()
     revertOriginal()
     ScreenGui:Destroy()
 end)
 
--- ====== DI CHUYỂN MENU ======
-local dragStartPos = nil
-local frameStartPos = nil
-local dragging = false
-
-local function isInBounds(pos, guiObject)
-    local absPos = guiObject.AbsolutePosition
-    local absSize = guiObject.AbsoluteSize
-    return pos.X >= absPos.X and pos.X <= absPos.X + absSize.X and
-           pos.Y >= absPos.Y and pos.Y <= absPos.Y + absSize.Y
-end
-
-local function startDrag(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-        if isInBounds(mousePos, TitleBar) and not isInBounds(mousePos, ResizeHandle) then
-            dragging = true
-            dragStartPos = mousePos
-            frameStartPos = MainFrame.Position
-        end
-    end
-end
-
-local function updateDrag(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-        local delta = mousePos - dragStartPos
-        MainFrame.Position = UDim2.new(frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X, frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y)
-    end
-end
-
-local function endDrag(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-        dragStartPos = nil
-        frameStartPos = nil
-    end
-end
-
-UIS.InputBegan:Connect(startDrag)
-UIS.InputChanged:Connect(updateDrag)
-UIS.InputEnded:Connect(endDrag)
-
--- ====== PHÓNG TO / THU NHỎ MENU ======
-local resizeStartPos = nil
-local frameStartSize = nil
-local resizing = false
-
-local function startResize(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-        if isInBounds(mousePos, ResizeHandle) then
-            resizing = true
-            resizeStartPos = mousePos
-            frameStartSize = MainFrame.Size
-        end
-    end
-end
-
-local function updateResize(input)
-    if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-        local delta = mousePos - resizeStartPos
-        local newWidth = math.max(180, frameStartSize.X.Offset + delta.X)
-        local newHeight = math.max(120, frameStartSize.Y.Offset + delta.Y)
-        MainFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
-    end
-end
-
-local function endResize(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        resizing = false
-        resizeStartPos = nil
-        frameStartSize = nil
-    end
-end
-
-UIS.InputBegan:Connect(startResize)
-UIS.InputChanged:Connect(updateResize)
-UIS.InputEnded:Connect(endResize)
-
-print("Shader menu 'meo bị down' (3 nút chất lượng) đã sẵn sàng!")
+print("Shader menu 'meo bị down' đã sẵn sàng! 12 phút = 1 ngày, mây điện ảnh, ngày & đêm tự nhiên.")
